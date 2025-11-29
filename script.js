@@ -6,17 +6,18 @@ document.addEventListener("DOMContentLoaded", () => {
     const detalleMateria = document.getElementById("detalle-materia");
     const botonInicio = document.querySelector('nav ul li a[href="#"]');
     const enlaceLogo = document.querySelector(".enlace");
+    const botonEjercicios = document.getElementById("practica");
 
-    // URLs de Google Sheets
     const sheetMateriasUrl = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSYZuMPhFaY7lMP81PbR3bOA9Mj06_cz0nm9hUvhyZrJpJTB4ZQG1-0zTsc06b5Dmej3egS2R3qx61G/pub?gid=0&single=true&output=csv";
     const sheetMaterialesUrl = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSYZuMPhFaY7lMP81PbR3bOA9Mj06_cz0nm9hUvhyZrJpJTB4ZQG1-0zTsc06b5Dmej3egS2R3qx61G/pub?gid=739950428&single=true&output=csv";
 
-    // Convierte "Análisis Matemático 1" -> "analisis-matematico-1"
+    function normalizar(texto) {
+        return texto.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+    }
     function slugify(text) {
-        return text.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/\s+/g, "-");
+        return normalizar(text).replace(/\s+/g, "-");
     }
 
-    // Carga listado de materias
     async function cargarMaterias() {
         const response = await fetch(sheetMateriasUrl);
         const data = await response.text();
@@ -40,7 +41,6 @@ document.addEventListener("DOMContentLoaded", () => {
             materiasContainer.appendChild(card);
         });
 
-        // Botones "Ver más"
         document.querySelectorAll(".materia-card button").forEach(btn => {
             btn.addEventListener("click", (e) => {
                 const nombreMateria = e.target.closest(".materia-card").querySelector("h3").textContent;
@@ -50,7 +50,6 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     }
 
-    // Mostrar materia y sus materiales
     async function mostrarMateria(nombreMateria) {
         hero.style.display = "none";
         materias.style.display = "none";
@@ -80,7 +79,10 @@ document.addEventListener("DOMContentLoaded", () => {
                 const columnas = fila.split(/,|;|\t/);
                 if (columnas.length < 4) return;
                 const [nombre, contenido, link, descripcion] = columnas.map(c => c.trim());
-                if (nombre === nombreMateria && contenido.toLowerCase().includes(tipo.toLowerCase())) {
+
+                if (normalizar(nombre) === normalizar(nombreMateria) &&
+                    normalizar(contenido).includes(normalizar(tipo))) {
+
                     const card = document.createElement("div");
                     card.className = "card-version";
                     card.innerHTML = `<p>${descripcion || "Material sin título"}</p>
@@ -89,6 +91,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     encontrados++;
                 }
             });
+
             if (encontrados === 0) {
                 const msg = document.createElement("p");
                 msg.className = "mensaje-vacio";
@@ -113,4 +116,75 @@ document.addEventListener("DOMContentLoaded", () => {
     enlaceLogo.addEventListener("click", volverInicio);
 
     cargarMaterias();
+
+    // 🔹 Funcionalidad botón EJERCICIOS
+    botonEjercicios.addEventListener("click", async () => {
+        hero.style.display = "none";
+        materias.style.display = "none";
+        detalleMateria.style.display = "block";
+        detalleMateria.innerHTML = `<h1>Ejercicios</h1>`;
+
+        const response = await fetch(sheetMaterialesUrl);
+        const data = await response.text();
+        const filas = data.split("\n").slice(1);
+
+        const bloque = document.createElement("section");
+        bloque.className = "bloque-material";
+
+        const buscador = document.createElement("input");
+        buscador.type = "text";
+        buscador.placeholder = "Buscar ejercicios...";
+        buscador.className = "buscador-input";
+        buscador.style.width = "70%";
+        buscador.style.padding = "12px";
+        buscador.style.margin = "20px 0";
+        buscador.style.fontSize = "1.1rem";
+        buscador.style.borderRadius = "8px";
+        buscador.style.border = "1px solid #ccc";
+        bloque.appendChild(buscador);
+
+        const contenedor = document.createElement("div");
+        contenedor.className = "versiones-container";
+        bloque.appendChild(contenedor);
+
+        let encontrados = 0;
+        filas.forEach(fila => {
+            const columnas = fila.split(/,|;|\t/);
+            if (columnas.length < 4) return;
+            const [nombre, contenido, link, descripcion] = columnas.map(c => c.trim());
+            if (normalizar(contenido) !== "ejercicios") return;
+
+            const card = document.createElement("div");
+            card.className = "card-version";
+            card.innerHTML = `<p>${descripcion || "Ejercicio"}</p>
+                              <a href="${link}" target="_blank">Ver PDF</a>`;
+            contenedor.appendChild(card);
+            encontrados++;
+        });
+
+        if (encontrados === 0) {
+            const msg = document.createElement("p");
+            msg.className = "mensaje-vacio";
+            msg.textContent = "No hay ejercicios cargados aún.";
+            bloque.appendChild(msg);
+        }
+
+        detalleMateria.appendChild(bloque);
+
+        // Filtrado en tiempo real
+        buscador.addEventListener("input", () => {
+            const texto = buscador.value.toLowerCase();
+            contenedor.querySelectorAll(".card-version").forEach(card => {
+                const contenidoCard = card.textContent.toLowerCase();
+                card.style.display = contenidoCard.includes(texto) ? "block" : "none";
+            });
+        });
+    });
+
+    // Cerrar menú hamburguesa automáticamente
+    document.querySelectorAll('nav ul li a').forEach(enlace => {
+        enlace.addEventListener('click', () => {
+            document.getElementById('check').checked = false;
+        });
+    });
 });
